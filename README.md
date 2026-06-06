@@ -7,7 +7,8 @@ Gett-style on-demand cleaning marketplace — book a trusted cleaner in minutes,
 | Package | Description |
 |---------|-------------|
 | `apps/api` | NestJS REST API (auth, jobs, matching, payments stub) |
-| `apps/admin-web` | Next.js admin dashboard |
+| `apps/customer-web` | **Customer website** — book cleaning (main app) |
+| `apps/admin-web` | Admin dashboard (ops only) |
 | `apps/customer-mobile` | Expo customer app |
 | `apps/cleaner-mobile` | Expo cleaner app |
 | `packages/shared` | Shared enums and TypeScript types |
@@ -37,8 +38,9 @@ pnpm db:up
 pnpm db:generate
 cd apps/api && pnpm exec prisma db push && pnpm db:seed
 cd ../..
-pnpm --filter @cleaners/api dev    # http://localhost:3001
-pnpm --filter @cleaners/admin-web dev  # http://localhost:3000
+pnpm --filter @cleaners/api dev           # http://localhost:3001
+pnpm --filter @cleaners/customer-web dev  # http://localhost:3002  ← main website
+pnpm --filter @cleaners/admin-web dev     # http://localhost:3000  (ops only)
 ```
 
 ### Dev auth

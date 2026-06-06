@@ -8,6 +8,7 @@
 |---------|------|----------|---------|
 | PostgreSQL + Redis | 5432, 6379 | Yes | `pnpm db:up` (Docker) |
 | API | 3001 | Yes | `pnpm --filter @cleaners/api dev` |
+| **Customer web** | **3002** | **Yes (main site)** | `pnpm --filter @cleaners/customer-web dev` |
 | Admin web | 3000 | Optional | `pnpm --filter @cleaners/admin-web dev` |
 | Customer mobile | 8081 | Optional | `pnpm --filter @cleaners/customer-mobile dev` |
 | Cleaner mobile | 8082 | Optional | `pnpm --filter @cleaners/cleaner-mobile dev` |
