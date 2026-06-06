@@ -17,6 +17,8 @@ Start databases before the API. After first clone, run `pnpm db:generate`, `pnpm
 
 Copy `.env.example` to `.env` (and `apps/api/.env` symlink or duplicate `DATABASE_URL`).
 
+Customer web proxies API calls via `/api/*` → `127.0.0.1:3001` so Cloud forwarded URLs work without CORS/`localhost` issues in the browser.
+
 ### Lint / test / build
 
 ```bash
