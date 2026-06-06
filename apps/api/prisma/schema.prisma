@@ -1,0 +1,318 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  CLEANER
+  ADMIN
+}
+
+enum CleanerVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum JobStatus {
+  REQUESTED
+  MATCHING
+  ASSIGNED
+  EN_ROUTE
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum JobOfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  REFUNDED
+  FAILED
+}
+
+enum RecurringFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+}
+
+enum NotificationEvent {
+  JOB_MATCHED
+  CLEANER_EN_ROUTE
+  JOB_COMPLETED
+  JOB_OFFER
+  CHAT_MESSAGE
+}
+
+enum PhotoType {
+  COMPLETION
+  ISSUE
+}
+
+model User {
+  id        String   @id @default(cuid())
+  role      UserRole
+  phone     String   @unique
+  email     String?  @unique
+  firstName String
+  lastName  String
+  passwordHash String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cleanerProfile   CleanerProfile?
+  addresses        Address[]
+  customerJobs     Job[]              @relation("CustomerJobs")
+  assignedJobs     Job[]              @relation("AssignedJobs")
+  ratingsGiven     Rating[]           @relation("RatingsGiven")
+  ratingsReceived  Rating[]           @relation("RatingsReceived")
+  documents        Document[]
+  favoriteCleaners FavoriteCleaner[]  @relation("CustomerFavorites")
+  favoritedBy      FavoriteCleaner[]  @relation("CleanerFavoritedBy")
+  recurringBookings RecurringBooking[]
+  chatMessages     ChatMessage[]
+  notifications    Notification[]
+  jobOffers        JobOffer[]
+  jobPhotos        JobPhoto[]
+}
+
+model CleanerProfile {
+  id                 String                    @id @default(cuid())
+  userId             String                    @unique
+  user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verificationStatus CleanerVerificationStatus @default(PENDING)
+  bio                String?
+  serviceRadiusKm    Float                     @default(10)
+  isOnline           Boolean                   @default(false)
+  lastLat            Float?
+  lastLng            Float?
+  ratingAverage      Float                     @default(0)
+  ratingCount        Int                       @default(0)
+  stripeAccountId    String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String
+  line1       String
+  line2       String?
+  city        String
+  postalCode  String
+  lat         Float
+  lng         Float
+  accessNotes String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  jobs              Job[]
+  recurringBookings RecurringBooking[]
+}
+
+model ServiceType {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  description     String
+  basePriceCents  Int
+  durationMinutes Int
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  jobs              Job[]
+  recurringBookings RecurringBooking[]
+  checklistTemplates ChecklistTemplate[]
+}
+
+model ChecklistTemplate {
+  id            String      @id @default(cuid())
+  serviceTypeId String
+  serviceType   ServiceType @relation(fields: [serviceTypeId], references: [id], onDelete: Cascade)
+  label         String
+  sortOrder     Int         @default(0)
+}
+
+model Job {
+  id               String    @id @default(cuid())
+  customerId       String
+  customer         User      @relation("CustomerJobs", fields: [customerId], references: [id])
+  cleanerId        String?
+  cleaner          User?     @relation("AssignedJobs", fields: [cleanerId], references: [id])
+  addressId        String
+  address          Address   @relation(fields: [addressId], references: [id])
+  serviceTypeId    String
+  serviceType      ServiceType @relation(fields: [serviceTypeId], references: [id])
+  status           JobStatus @default(REQUESTED)
+  isOnDemand       Boolean   @default(true)
+  scheduledAt      DateTime
+  priceCents       Int
+  durationMinutes  Int
+  preferredCleanerId String?
+  etaMinutes       Int?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  cancelReason     String?
+  recurringBookingId String?
+  recurringBooking RecurringBooking? @relation(fields: [recurringBookingId], references: [id])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  offers       JobOffer[]
+  payment      Payment?
+  ratings      Rating[]
+  chatMessages ChatMessage[]
+  checklist    JobChecklistItem[]
+  photos       JobPhoto[]
+}
+
+model JobOffer {
+  id         String         @id @default(cuid())
+  jobId      String
+  job        Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  cleanerId  String
+  cleaner    User           @relation(fields: [cleanerId], references: [id])
+  status     JobOfferStatus @default(PENDING)
+  expiresAt  DateTime
+  respondedAt DateTime?
+  createdAt  DateTime       @default(now())
+
+  @@unique([jobId, cleanerId])
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  jobId                 String        @unique
+  job                   Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status                PaymentStatus @default(PENDING)
+  amountCents           Int
+  platformFeeCents      Int
+  cleanerPayoutCents    Int
+  stripePaymentIntentId String?
+  refundedCents         Int           @default(0)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+}
+
+model Rating {
+  id         String   @id @default(cuid())
+  jobId      String
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fromUserId String
+  fromUser   User     @relation("RatingsGiven", fields: [fromUserId], references: [id])
+  toUserId   String
+  toUser     User     @relation("RatingsReceived", fields: [toUserId], references: [id])
+  score      Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@unique([jobId, fromUserId])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model FavoriteCleaner {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   User     @relation("CustomerFavorites", fields: [customerId], references: [id], onDelete: Cascade)
+  cleanerId  String
+  cleaner    User     @relation("CleanerFavoritedBy", fields: [cleanerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, cleanerId])
+}
+
+model RecurringBooking {
+  id                 String             @id @default(cuid())
+  customerId         String
+  customer           User               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  addressId          String
+  address            Address            @relation(fields: [addressId], references: [id])
+  serviceTypeId      String
+  serviceType        ServiceType        @relation(fields: [serviceTypeId], references: [id])
+  preferredCleanerId String?
+  frequency          RecurringFrequency
+  nextRunAt          DateTime
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  jobs Job[]
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model JobChecklistItem {
+  id          String    @id @default(cuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  label       String
+  sortOrder   Int       @default(0)
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+}
+
+model JobPhoto {
+  id        String    @id @default(cuid())
+  jobId     String
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  uploaderId String
+  uploader  User      @relation(fields: [uploaderId], references: [id])
+  type      PhotoType @default(COMPLETION)
+  url       String
+  createdAt DateTime  @default(now())
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel
+  event     NotificationEvent
+  title     String
+  body      String
+  payload   Json?
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+}
